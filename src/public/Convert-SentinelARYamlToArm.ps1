@@ -45,11 +45,17 @@ Start time must be between 10 minutes and 30 days from now. This is not validate
 .PARAMETER DisableIncidentCreation
 If set, the incidentCreation property of the ARM template will be set to false. Default is to keep the value from the YAML file.
 
+.PARAMETER ProvidedId
+If you already have the rule deployed and want to reuse the ID (Multiple tenants deployments through github/devops) /hitem
+
 .EXAMPLE
-Convert-SentinelARYamlToArm -Filename "C:\Temp\MyRule.yaml" -OutFile "C:\Temp\MyRule.json"
+Convert-SentinelARYamlToArm -Filename "C:\Temp\MyRule.yaml" -OutFile "C:\Temp\MyRule.json" 
+    (will generate with a new unique GUID)
+Convert-SentinelARYamlToArm -Filename "C:\Temp\MyRule.yaml" -OutFile "C:\Temp\MyRule.json" -ProvidedId "12134-42133-65456-12344"  
+    (will reuse the id you want)
 
 .NOTES
-  Author: Fabian Bader (https://cloudbrothers.info/)
+  Orginal Author: Fabian Bader (https://cloudbrothers.info/)
 #>
 
 function Convert-SentinelARYamlToArm {
@@ -110,7 +116,10 @@ function Convert-SentinelARYamlToArm {
         [datetime]$StartRunningAt,
 
         [Parameter()]
-        [switch]$DisableIncidentCreation
+        [switch]$DisableIncidentCreation,
+
+        [Parameter()]
+        [string]$ProvidedId
     )
 
     begin {
@@ -236,22 +245,25 @@ function Convert-SentinelARYamlToArm {
         }
         #endregion Parameter file handling
 
-        if ( [string]::IsNullOrWhiteSpace($analyticRule.name) -or [string]::IsNullOrWhiteSpace($analyticRule.id) ) {
-            throw "Analytics Rule name or id is empty. YAML might be corrupted"
-        }
-
         # Generate new guid if id is not a valid guid
         #if ($analyticRule.id -notmatch "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}") {
         #    Write-Warning "Error reading current Id. Generating new Id."
         #    $analyticRule.id = (New-Guid).Guid
         #}
 
+        # Check if the user supplied an ID, otherwise generate a new GUID
+        if (-not [string]::IsNullOrWhiteSpace($ProvidedId)) {
+            Write-Verbose "Using provided ID: $ProvidedId"
+            $analyticRule.id = $ProvidedId
+        }
+        else {
+            Write-Verbose "Generating new GUID for ID"
+            $analyticRule.id = (New-Guid).Guid
+        }
+
         if ([string]::IsNullOrWhiteSpace($analyticRule.name) -or [string]::IsNullOrWhiteSpace($analyticRule.id)) {
             throw "Analytics Rule name or id is empty. YAML might be corrupted"
         }
-
-        # Always generate new GUID for the ID
-        $analyticRule.id = (New-Guid).Guid
 
         # Add prefix to name if specified
         if ($NamePrefix) {
