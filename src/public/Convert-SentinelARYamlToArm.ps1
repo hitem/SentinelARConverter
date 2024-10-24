@@ -119,7 +119,8 @@ function Convert-SentinelARYamlToArm {
                 if (-not (Test-Path $Filename)) {
                     Write-Error -Exception
                 }
-            } catch {
+            }
+            catch {
                 throw "File not found"
             }
         }
@@ -129,7 +130,8 @@ function Convert-SentinelARYamlToArm {
                 if (-not (Test-Path $ParameterFile)) {
                     Write-Error -Exception
                 }
-            } catch {
+            }
+            catch {
                 throw "Parameters file not found"
             }
         }
@@ -148,11 +150,13 @@ function Convert-SentinelARYamlToArm {
             # Use parsed pipeline data if no file was specified (default)
             if ($PsCmdlet.ParameterSetName -eq "Pipeline") {
                 $analyticRule = $FullYaml | ConvertFrom-Yaml
-            } else {
+            }
+            else {
                 Write-Verbose "Read file `"$Filename`""
                 $analyticRule = Get-Content $Filename | ConvertFrom-Yaml
             }
-        } catch {
+        }
+        catch {
             throw "Could not convert source file. YAML might be corrupted"
         }
 
@@ -160,10 +164,12 @@ function Convert-SentinelARYamlToArm {
             if ($ParameterFile) {
                 Write-Verbose "Read parameters file `"$ParameterFile`""
                 $Parameters = Get-Content $ParameterFile | ConvertFrom-Yaml
-            } else {
+            }
+            else {
                 Write-Verbose "No parameters file provided"
             }
-        } catch {
+        }
+        catch {
             throw "Could not convert parameters file. YAML might be corrupted"
         }
 
@@ -175,12 +181,14 @@ function Convert-SentinelARYamlToArm {
                     if ($analyticRule.ContainsKey($Key)) {
                         Write-Verbose "Overwriting property $Key with $($Parameters.OverwriteProperties[$Key])"
                         $analyticRule[$Key] = $Parameters.OverwriteProperties[$Key]
-                    } else {
+                    }
+                    else {
                         Write-Verbose "Add new property $Key with $($Parameters.OverwriteProperties[$Key])"
                         $analyticRule.Add($Key, $Parameters.OverwriteProperties[$Key])
                     }
                 }
-            } else {
+            }
+            else {
                 Write-Verbose "No properties to overwrite in provided parameters file"
             }
             #endregion Overwrite values from parameters file
@@ -188,7 +196,8 @@ function Convert-SentinelARYamlToArm {
             #region Prepend KQL query with data from parameters file
             if ($Parameters.PrependQuery) {
                 $analyticRule.query = $Parameters.PrependQuery + $analyticRule.query
-            } else {
+            }
+            else {
                 Write-Verbose "No query to prepend in provided parameters file"
             }
             #endregion Prepend KQL query with data from parameters file
@@ -196,7 +205,8 @@ function Convert-SentinelARYamlToArm {
             #region Append KQL query with data from parameters file
             if ($Parameters.AppendQuery) {
                 $analyticRule.query = $analyticRule.query + $Parameters.AppendQuery
-            } else {
+            }
+            else {
                 Write-Verbose "No query to append in provided parameters file"
             }
             #endregion Append KQL query with data from parameters file
@@ -208,14 +218,16 @@ function Convert-SentinelARYamlToArm {
                         # Join array values with comma and wrap in quotes
                         $ReplaceValue = $Parameters.ReplaceQueryVariables[$Key] -join '","'
                         $ReplaceValue = '"' + $ReplaceValue + '"'
-                    } else {
+                    }
+                    else {
                         # Use single value
                         $ReplaceValue = $Parameters.ReplaceQueryVariables[$Key]
                     }
                     Write-Verbose "Replacing variable %%$Key%% with $($ReplaceValue)"
                     $analyticRule.query = $analyticRule.query -replace "%%$($Key)%%", $ReplaceValue
                 }
-            } else {
+            }
+            else {
                 Write-Verbose "No variables to replace in provided parameters file"
             }
             #endregion Replace variables in KQL query with data from parameters file
@@ -229,10 +241,17 @@ function Convert-SentinelARYamlToArm {
         }
 
         # Generate new guid if id is not a valid guid
-        if ($analyticRule.id -notmatch "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}") {
-            Write-Warning "Error reading current Id. Generating new Id."
-            $analyticRule.id = (New-Guid).Guid
+        #if ($analyticRule.id -notmatch "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}") {
+        #    Write-Warning "Error reading current Id. Generating new Id."
+        #    $analyticRule.id = (New-Guid).Guid
+        #}
+
+        if ([string]::IsNullOrWhiteSpace($analyticRule.name) -or [string]::IsNullOrWhiteSpace($analyticRule.id)) {
+            throw "Analytics Rule name or id is empty. YAML might be corrupted"
         }
+
+        # Always generate new GUID for the ID
+        $analyticRule.id = (New-Guid).Guid
 
         # Add prefix to name if specified
         if ($NamePrefix) {
@@ -328,7 +347,8 @@ function Convert-SentinelARYamlToArm {
                 # Change values of compare operators
                 if ( $analyticRule[$Item] -in $CompareOperatorYaml2Arm.Keys ) {
                     $Value = $CompareOperatorYaml2Arm[$analyticRule[$Item]]
-                } else {
+                }
+                else {
                     $Value = $analyticRule[$Item]
                 }
                 # Add value to hashtable
@@ -390,7 +410,8 @@ function Convert-SentinelARYamlToArm {
             }
             # Add new startTimeUtc property
             $ARMTemplate.Add("startTimeUtc", $StartRunningAt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ"))
-        } elseif ($StartRunningAt) {
+        }
+        elseif ($StartRunningAt) {
             Write-Warning "StartRunningAt parameter is only supported for scheduled rules. Ignoring parameter."
         }
 
@@ -414,9 +435,11 @@ function Convert-SentinelARYamlToArm {
 
         if ($analyticRule.kind -eq "Scheduled") {
             $ScheduleKind = "Scheduled"
-        } elseif ($analyticRule.kind -eq "Nrt") {
+        }
+        elseif ($analyticRule.kind -eq "Nrt") {
             $ScheduleKind = "NRT"
-        } else {
+        }
+        else {
             $ScheduleKind = $analyticRule.kind.substring(0, 1).toupper() + $analyticRule.kind.substring(1).tolower()
         }
 
@@ -431,7 +454,8 @@ function Convert-SentinelARYamlToArm {
         if ($OutFile) {
             $Result | Out-File $OutFile -Force
             Write-Verbose "Output written to file: `"$OutFile`""
-        } else {
+        }
+        else {
             return $Result
         }
     }
